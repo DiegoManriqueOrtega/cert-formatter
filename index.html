@@ -1,0 +1,231 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Certificate Formatter</title>
+  <style>
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #0f172a;
+      color: #e2e8f0;
+      min-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      padding: 2rem 1rem;
+    }
+    h1 {
+      font-size: 1.5rem;
+      margin-bottom: 0.25rem;
+      color: #f8fafc;
+    }
+    .subtitle {
+      color: #94a3b8;
+      font-size: 0.875rem;
+      margin-bottom: 1.5rem;
+    }
+    .container {
+      width: 100%;
+      max-width: 720px;
+      display: flex;
+      flex-direction: column;
+      gap: 1rem;
+    }
+    label {
+      font-size: 0.8rem;
+      color: #94a3b8;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+    }
+    textarea {
+      width: 100%;
+      min-height: 180px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      color: #e2e8f0;
+      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+      font-size: 0.8rem;
+      padding: 1rem;
+      resize: vertical;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    textarea:focus { border-color: #6366f1; }
+
+    .output-section { position: relative; }
+    #output {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 1rem;
+      font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
+      font-size: 0.8rem;
+      white-space: pre-wrap;
+      word-break: break-all;
+      min-height: 80px;
+      color: #a5f3fc;
+      user-select: all;
+    }
+    .toast {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      background: #22c55e;
+      color: #fff;
+      padding: 0.6rem 1.2rem;
+      border-radius: 6px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      opacity: 0;
+      transform: translateY(8px);
+      transition: opacity 0.25s, transform 0.25s;
+      pointer-events: none;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .error { color: #f87171; }
+  </style>
+</head>
+<body>
+  <h1>Certificate / Key Formatter</h1>
+  <p class="subtitle">Paste your raw JSON string — formatted PEM is auto-copied to clipboard</p>
+
+  <div class="container">
+    <div>
+      <label for="input">Input (JSON, escaped string, or raw PEM)</label>
+      <textarea id="input" spellcheck="false" placeholder='Paste here, e.g. {"str":"-----BEGIN PRIVATE KEY-----\nMII..."}'></textarea>
+    </div>
+
+    <div class="output-section">
+      <label>Output</label>
+      <div id="output">Formatted certificate will appear here...</div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast">Copied to clipboard!</div>
+
+  <script>
+    function extractPEM(raw) {
+      let text = raw.trim();
+
+      // Try to parse as JSON to extract any string value automatically
+      try {
+        const parsed = JSON.parse(text);
+        text = findPEMString(parsed);
+      } catch {
+        // Not valid JSON — try to extract the string value manually
+        // Match a quoted string value after a key like "str": "..."
+        const match = text.match(/"(?:[^"\\]|\\.)*-----BEGIN[^"]*-----(?:[^"\\]|\\.)*-----END[^"]*-----(?:[^"\\]|\\.)*"/);
+        if (match) {
+          try {
+            text = JSON.parse(match[0]);
+          } catch {
+            // fall through
+          }
+        }
+      }
+
+      // Replace literal \n with newlines
+      text = text.replace(/\\n/g, '\n');
+
+      // Extract PEM block(s)
+      const pemRegex = /(-----BEGIN [A-Z0-9 ]+-----[\s\S]*?-----END [A-Z0-9 ]+-----)/g;
+      const blocks = text.match(pemRegex);
+
+      if (blocks) {
+        return blocks.map(b => cleanPEM(b)).join('\n\n');
+      }
+
+      throw new Error('No PEM certificate or key found in the input.');
+    }
+
+    function findPEMString(obj) {
+      if (typeof obj === 'string') return obj;
+      if (Array.isArray(obj)) {
+        for (const item of obj) {
+          try { return findPEMString(item); } catch { /* continue */ }
+        }
+      } else if (obj && typeof obj === 'object') {
+        for (const val of Object.values(obj)) {
+          try { return findPEMString(val); } catch { /* continue */ }
+        }
+      }
+      throw new Error('No string value found');
+    }
+
+    function cleanPEM(pem) {
+      const lines = pem.split('\n').map(l => l.trim()).filter(Boolean);
+      const header = lines[0];
+      const footer = lines[lines.length - 1];
+      const body = lines.slice(1, -1).join('');
+      // Re-wrap body at 64 chars
+      const wrapped = body.match(/.{1,64}/g) || [];
+      return [header, ...wrapped, footer].join('\n');
+    }
+
+    function format() {
+      const input = document.getElementById('input').value;
+      const output = document.getElementById('output');
+      if (!input.trim()) {
+        output.innerHTML = '<span class="error">Please paste some input first.</span>';
+        return;
+      }
+      try {
+        output.textContent = extractPEM(input);
+        output.classList.remove('error');
+      } catch (e) {
+        output.innerHTML = '<span class="error">' + escapeHTML(e.message) + '</span>';
+      }
+    }
+
+    function escapeHTML(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+
+    async function copyOutput() {
+      const text = document.getElementById('output').textContent;
+      if (!text || text.startsWith('Formatted')) return;
+      try {
+        await navigator.clipboard.writeText(text);
+        showToast('Copied to clipboard!');
+      } catch {
+        showToast('Copy failed — select and copy manually.');
+      }
+    }
+
+    function clearAll() {
+      document.getElementById('input').value = '';
+      document.getElementById('output').textContent = 'Formatted certificate will appear here...';
+    }
+
+    function showToast(msg) {
+      const toast = document.getElementById('toast');
+      toast.textContent = msg;
+      toast.classList.add('show');
+      setTimeout(() => toast.classList.remove('show'), 1800);
+    }
+
+    // Auto-format + auto-copy on paste
+    document.getElementById('input').addEventListener('paste', () => {
+      setTimeout(async () => {
+        const input = document.getElementById('input').value;
+        const output = document.getElementById('output');
+        if (!input.trim()) return;
+        try {
+          const result = extractPEM(input);
+          output.textContent = result;
+          output.classList.remove('error');
+          await navigator.clipboard.writeText(result);
+          showToast('Formatted & copied to clipboard!');
+        } catch (e) {
+          output.innerHTML = '<span class="error">' + escapeHTML(e.message) + '</span>';
+        }
+      }, 50);
+    });
+  </script>
+</body>
+</html>
