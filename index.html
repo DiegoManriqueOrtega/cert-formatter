@@ -27,6 +27,7 @@
       display: flex;
       flex-direction: row;
       align-items: stretch;
+      gap: 1.5rem;
     }
     .panel {
       flex: 1;
@@ -43,14 +44,14 @@
     }
     textarea {
       width: 100%;
-      min-height: 240px;
+      min-height: 340px;
       background: #1e293b;
       border: 1px solid #334155;
       border-radius: 8px;
       color: #e2e8f0;
       font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
-      font-size: 0.8rem;
-      padding: 1rem;
+      font-size: 0.92rem;
+      padding: 1.25rem;
       resize: vertical;
       overflow: hidden;
       outline: none;
@@ -58,13 +59,13 @@
     }
     textarea:focus { border-color: #6366f1; }
     #output {
-      min-height: 240px;
+      min-height: 340px;
       background: #1e293b;
       border: 1px solid #334155;
       border-radius: 8px;
-      padding: 1rem;
+      padding: 1.25rem;
       font-family: 'Cascadia Code', 'Fira Code', 'Consolas', monospace;
-      font-size: 0.8rem;
+      font-size: 0.92rem;
       white-space: pre-wrap;
       word-break: break-all;
       color: #a5f3fc;
@@ -112,20 +113,7 @@
       85%  { opacity: 1; }
       100% { left: calc(100% + 40px); opacity: 0; }
     }
-    .connector-arrow {
-      position: relative;
-      z-index: 1;
-      font-size: 1.2rem;
-      color: #475569;
-      line-height: 1;
-      user-select: none;
-    }
-    .connector.flowing .connector-arrow { animation: arrow-glow 0.55s ease-out; }
-    @keyframes arrow-glow {
-      0%   { color: #475569; }
-      40%  { color: #a5b4fc; text-shadow: 0 0 12px #6366f1; }
-      100% { color: #475569; text-shadow: none; }
-    }
+
     @keyframes beam-flow-v {
       0%   { top: -24px; opacity: 0; }
       15%  { opacity: 1; }
@@ -181,13 +169,9 @@
       <textarea id="input" spellcheck="false" placeholder='Paste here, e.g. {"str":"-----BEGIN PRIVATE KEY-----\nMII..."}'></textarea>
     </div>
 
-
-
-    <div class="panel">
-      <label>Output</label>
-      <div id="output">Formatted certificate will appear here...</div>
+    <div class="connector" id="connector">
+      <div class="connector-beam"></div>
     </div>
-  </div>
 
   <div class="toast" id="toast">Copied to clipboard!</div>
 
