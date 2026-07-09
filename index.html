@@ -52,6 +52,7 @@
       font-size: 0.8rem;
       padding: 1rem;
       resize: vertical;
+      overflow: hidden;
       outline: none;
       transition: border-color 0.2s;
     }
@@ -75,7 +76,6 @@
       100% { border-color: #334155; box-shadow: none; }
     }
 
-    /* ── Connector ── */
     .connector {
       width: 72px;
       flex-shrink: 0;
@@ -133,7 +133,6 @@
       100% { top: calc(100% + 24px); opacity: 0; }
     }
 
-    /* ── Responsive ── */
     @media (max-width: 680px) {
       .panels { flex-direction: column; }
       .connector { width: auto; height: 44px; overflow: hidden; }
@@ -182,10 +181,7 @@
       <textarea id="input" spellcheck="false" placeholder='Paste here, e.g. {"str":"-----BEGIN PRIVATE KEY-----\nMII..."}'></textarea>
     </div>
 
-    <div class="connector" id="connector">
-      <div class="connector-beam"></div>
-      <span class="connector-arrow">→</span>
-    </div>
+
 
     <div class="panel">
       <label>Output</label>
@@ -199,27 +195,21 @@
     function extractPEM(raw) {
       let text = raw.trim();
 
-      // Try to parse as JSON to extract any string value automatically
       try {
         const parsed = JSON.parse(text);
         text = findPEMString(parsed);
       } catch {
-        // Not valid JSON — try to extract the string value manually
-        // Match a quoted string value after a key like "str": "..."
         const match = text.match(/"(?:[^"\\]|\\.)*-----BEGIN[^"]*-----(?:[^"\\]|\\.)*-----END[^"]*-----(?:[^"\\]|\\.)*"/);
         if (match) {
           try {
             text = JSON.parse(match[0]);
           } catch {
-            // fall through
           }
         }
       }
 
-      // Replace literal \n with newlines
       text = text.replace(/\\n/g, '\n');
 
-      // Extract PEM block(s)
       const pemRegex = /(-----BEGIN [A-Z0-9 ]+-----[\s\S]*?-----END [A-Z0-9 ]+-----)/g;
       const blocks = text.match(pemRegex);
 
@@ -234,11 +224,11 @@
       if (typeof obj === 'string') return obj;
       if (Array.isArray(obj)) {
         for (const item of obj) {
-          try { return findPEMString(item); } catch { /* continue */ }
+          try { return findPEMString(item); } catch { }
         }
       } else if (obj && typeof obj === 'object') {
         for (const val of Object.values(obj)) {
-          try { return findPEMString(val); } catch { /* continue */ }
+          try { return findPEMString(val); } catch { }
         }
       }
       throw new Error('No string value found');
@@ -249,7 +239,6 @@
       const header = lines[0];
       const footer = lines[lines.length - 1];
       const body = lines.slice(1, -1).join('');
-      // Re-wrap body at 64 chars
       const wrapped = body.match(/.{1,64}/g) || [];
       return [header, ...wrapped, footer].join('\n');
     }
@@ -310,10 +299,19 @@
       setTimeout(() => output.classList.remove('flash'), 750);
     }
 
-    // Auto-format + auto-copy on paste
-    document.getElementById('input').addEventListener('paste', () => {
+    const inputEl = document.getElementById('input');
+
+    function autoResize() {
+      inputEl.style.height = 'auto';
+      inputEl.style.height = inputEl.scrollHeight + 'px';
+    }
+
+    inputEl.addEventListener('input', autoResize);
+
+    inputEl.addEventListener('paste', () => {
       setTimeout(async () => {
-        const input = document.getElementById('input').value;
+        autoResize();
+        const input = inputEl.value;
         const output = document.getElementById('output');
         if (!input.trim()) return;
         try {
