@@ -18,20 +18,22 @@
     }
     h1 {
       font-size: 1.5rem;
-      margin-bottom: 0.25rem;
+      margin-bottom: 1.5rem;
       color: #f8fafc;
     }
-    .subtitle {
-      color: #94a3b8;
-      font-size: 0.875rem;
-      margin-bottom: 1.5rem;
-    }
-    .container {
+    .panels {
       width: 100%;
-      max-width: 720px;
+      max-width: 1100px;
+      display: flex;
+      flex-direction: row;
+      align-items: stretch;
+    }
+    .panel {
+      flex: 1;
+      min-width: 0;
       display: flex;
       flex-direction: column;
-      gap: 1rem;
+      gap: 0.5rem;
     }
     label {
       font-size: 0.8rem;
@@ -41,7 +43,7 @@
     }
     textarea {
       width: 100%;
-      min-height: 180px;
+      min-height: 240px;
       background: #1e293b;
       border: 1px solid #334155;
       border-radius: 8px;
@@ -54,9 +56,8 @@
       transition: border-color 0.2s;
     }
     textarea:focus { border-color: #6366f1; }
-
-    .output-section { position: relative; }
     #output {
+      min-height: 240px;
       background: #1e293b;
       border: 1px solid #334155;
       border-radius: 8px;
@@ -65,10 +66,94 @@
       font-size: 0.8rem;
       white-space: pre-wrap;
       word-break: break-all;
-      min-height: 80px;
       color: #a5f3fc;
       user-select: all;
     }
+    #output.flash { animation: output-flash 0.7s ease-out forwards; }
+    @keyframes output-flash {
+      0%   { border-color: #6366f1; box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.25); }
+      100% { border-color: #334155; box-shadow: none; }
+    }
+
+    /* ── Connector ── */
+    .connector {
+      width: 72px;
+      flex-shrink: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      position: relative;
+      overflow: hidden;
+    }
+    .connector::before {
+      content: '';
+      position: absolute;
+      top: 50%; left: 0; right: 0;
+      height: 1px;
+      background: #334155;
+      transform: translateY(-50%);
+    }
+    .connector-beam {
+      position: absolute;
+      top: 50%; left: -40px;
+      transform: translateY(-50%);
+      width: 40px; height: 6px;
+      border-radius: 3px;
+      background: linear-gradient(90deg, transparent, #818cf8, #e0e7ff);
+      opacity: 0;
+      pointer-events: none;
+    }
+    .connector.flowing .connector-beam {
+      animation: beam-flow 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+    }
+    @keyframes beam-flow {
+      0%   { left: -40px; opacity: 0; }
+      15%  { opacity: 1; }
+      85%  { opacity: 1; }
+      100% { left: calc(100% + 40px); opacity: 0; }
+    }
+    .connector-arrow {
+      position: relative;
+      z-index: 1;
+      font-size: 1.2rem;
+      color: #475569;
+      line-height: 1;
+      user-select: none;
+    }
+    .connector.flowing .connector-arrow { animation: arrow-glow 0.55s ease-out; }
+    @keyframes arrow-glow {
+      0%   { color: #475569; }
+      40%  { color: #a5b4fc; text-shadow: 0 0 12px #6366f1; }
+      100% { color: #475569; text-shadow: none; }
+    }
+    @keyframes beam-flow-v {
+      0%   { top: -24px; opacity: 0; }
+      15%  { opacity: 1; }
+      85%  { opacity: 1; }
+      100% { top: calc(100% + 24px); opacity: 0; }
+    }
+
+    /* ── Responsive ── */
+    @media (max-width: 680px) {
+      .panels { flex-direction: column; }
+      .connector { width: auto; height: 44px; overflow: hidden; }
+      .connector::before {
+        top: 0; bottom: 0; left: 50%; right: auto;
+        width: 1px; height: 100%;
+        transform: translateX(-50%);
+      }
+      .connector-beam {
+        left: 50%; top: -24px;
+        transform: translateX(-50%);
+        width: 6px; height: 24px;
+        background: linear-gradient(180deg, transparent, #818cf8, #e0e7ff);
+      }
+      .connector.flowing .connector-beam {
+        animation: beam-flow-v 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+      }
+      .connector-arrow { transform: rotate(90deg); }
+    }
+
     .toast {
       position: fixed;
       bottom: 1.5rem;
@@ -90,15 +175,19 @@
 </head>
 <body>
   <h1>Certificate / Key Formatter</h1>
-  <p class="subtitle">Paste your raw JSON string — formatted PEM is auto-copied to clipboard</p>
 
-  <div class="container">
-    <div>
-      <label for="input">Input (JSON, escaped string, or raw PEM)</label>
+  <div class="panels">
+    <div class="panel">
+      <label for="input">Input</label>
       <textarea id="input" spellcheck="false" placeholder='Paste here, e.g. {"str":"-----BEGIN PRIVATE KEY-----\nMII..."}'></textarea>
     </div>
 
-    <div class="output-section">
+    <div class="connector" id="connector">
+      <div class="connector-beam"></div>
+      <span class="connector-arrow">→</span>
+    </div>
+
+    <div class="panel">
       <label>Output</label>
       <div id="output">Formatted certificate will appear here...</div>
     </div>
@@ -209,6 +298,18 @@
       setTimeout(() => toast.classList.remove('show'), 1800);
     }
 
+    function triggerFlowAnimation() {
+      const connector = document.getElementById('connector');
+      const output = document.getElementById('output');
+      connector.classList.remove('flowing');
+      output.classList.remove('flash');
+      void connector.offsetWidth;
+      connector.classList.add('flowing');
+      output.classList.add('flash');
+      setTimeout(() => connector.classList.remove('flowing'), 600);
+      setTimeout(() => output.classList.remove('flash'), 750);
+    }
+
     // Auto-format + auto-copy on paste
     document.getElementById('input').addEventListener('paste', () => {
       setTimeout(async () => {
@@ -219,6 +320,7 @@
           const result = extractPEM(input);
           output.textContent = result;
           output.classList.remove('error');
+          triggerFlowAnimation();
           await navigator.clipboard.writeText(result);
           showToast('Formatted & copied to clipboard!');
         } catch (e) {
